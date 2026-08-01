@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hızlı Video İndirici</title>
+    <!-- Modern Tasarım İçin Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="max-w-xl w-full bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
+        <h1 class="text-2xl font-bold text-center mb-2 text-indigo-400">Video & Müzik İndirici</h1>
+        <p class="text-slate-400 text-sm text-center mb-6">YouTube, Facebook, Instagram veya TikTok linkini yapıştırın.</p>
+
+        <!-- Link Giriş Formu -->
+        <div class="flex gap-2 mb-6">
+            <input type="text" id="videoUrl" placeholder="https://www.youtube.com/watch?v=..." 
+                   class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl focus:outline-none focus:border-indigo-500 text-sm">
+            <button onclick="fetchVideoData()" id="btnFetch" 
+                    class="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-xl font-medium transition duration-200">
+                Sorgula
+            </button>
+        </div>
+
+        <!-- Yükleniyor Uyarısı -->
+        <div id="loading" class="hidden text-center py-4 text-indigo-400 font-semibold animate-pulse">
+            Video bilgileri çekiliyor, lütfen bekleyin...
+        </div>
+
+        <!-- Hata Uyarısı -->
+        <div id="error" class="hidden text-center py-3 px-4 bg-red-900/50 border border-red-500/50 text-red-300 rounded-xl mb-4 text-sm"></div>
+
+        <!-- Sonuç Alanı -->
+        <div id="result" class="hidden space-y-4">
+            <div class="flex flex-col sm:flex-row gap-4 items-center bg-slate-700/50 p-4 rounded-xl">
+                <img id="thumb" class="w-full sm:w-32 h-24 object-cover rounded-lg" src="" alt="Thumbnail">
+                <div>
+                    <h3 id="title" class="font-semibold text-sm line-clamp-2"></h3>
+                    <p id="duration" class="text-xs text-slate-400 mt-1"></p>
+                </div>
+            </div>
+
+            <!-- İndirme Seçenekleri Listesi -->
+            <div id="downloadLinks" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchVideoData() {
+            const input = document.getElementById('videoUrl').value.trim();
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const result = document.getElementById('result');
+            const downloadLinks = document.getElementById('downloadLinks');
+
+            if (!input) {
+                showError("Lütfen geçerli bir video linki girin.");
+                return;
+            }
+
+            // Arayüz sıfırlama
+            error.classList.add('hidden');
+            result.classList.add('hidden');
+            loading.classList.remove('hidden');
+
+            try {
+                // Her platformu destekleyen Genel All-in-One API İsteği
+                const response = await fetch(`https://api.cobalt.tools/`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        url: input,
+                        videoQuality: '1080'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'error') {
+                    throw new Error(data.text || 'Video bilgisi alınamadı.');
+                }
+
+                // Cobalt API Başarılı Dönüş Senaryoları
+                if (data.status === 'picker') {
+                    // Fotoğraf galerisi veya çoklu medya
+                    renderPickerLinks(data.picker);
+                } else if (data.url) {
+                    // Tekli video/ses linki
+                    renderSingleLink(data.url);
+                }
+
+                loading.classList.add('hidden');
+                result.classList.remove('hidden');
+
+            } catch (err) {
+                loading.classList.add('hidden');
+                showError("Video işlenirken bir sorun oluştu. Linki kontrol edip tekrar deneyin.");
+                console.error(err);
+            }
+        }
+
+        function renderSingleLink(downloadUrl) {
+            document.getElementById('thumb').src = 'https://placehold.co/300x200/334155/fff?text=Video+Hazir';
+            document.getElementById('title').innerText = "Videonuz İndirilmeye Hazır";
+            document.getElementById('duration').innerText = "";
+
+            const linksContainer = document.getElementById('downloadLinks');
+            linksContainer.innerHTML = `
+                <a href="${downloadUrl}" target="_blank" download 
+                   class="block w-full text-center bg-green-600 hover:bg-green-500 text-white font-medium py-3 rounded-xl transition duration-200">
+                   Videoyu İndir (MP4)
+                </a>
+            `;
+        }
+
+        function renderPickerLinks(items) {
+            document.getElementById('thumb').src = items[0].thumb || 'https://placehold.co/300x200/334155/fff?text=Medya';
+            document.getElementById('title').innerText = "Birden Fazla Medya Bulundu";
+
+            const linksContainer = document.getElementById('downloadLinks');
+            linksContainer.innerHTML = '';
+
+            items.forEach((item, index) => {
+                linksContainer.innerHTML += `
+                    <a href="${item.url}" target="_blank" download 
+                       class="block w-full text-center bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium py-2 rounded-lg transition">
+                       Medya ${index + 1} İndir
+                    </a>
+                `;
+            });
+        }
+
+        function showError(msg) {
+            const error = document.getElementById('error');
+            error.innerText = msg;
+            error.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
