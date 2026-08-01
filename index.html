@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hızlı Video İndirici</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="max-w-xl w-full bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
+        <h1 class="text-2xl font-bold text-center mb-2 text-indigo-400">Video & Müzik İndirici</h1>
+        <p class="text-slate-400 text-sm text-center mb-6">YouTube video bağlantısını yapıştırın, kaliteyi seçip indirin.</p>
+
+        <!-- Link Giriş Formu -->
+        <div class="flex gap-2 mb-6">
+            <input type="text" id="videoUrl" placeholder="https://www.youtube.com/watch?v=..." 
+                   class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl focus:outline-none focus:border-indigo-500 text-sm text-white placeholder-slate-400">
+            <button onclick="fetchVideoData()" id="btnFetch" 
+                    class="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-xl font-medium transition duration-200 shrink-0">
+                Sorgula
+            </button>
+        </div>
+
+        <!-- Yükleniyor Uyarısı -->
+        <div id="loading" class="hidden text-center py-6 text-indigo-400 font-semibold animate-pulse">
+            Video bilgileri ve kaliteler getiriliyor...
+        </div>
+
+        <!-- Hata Uyarısı -->
+        <div id="error" class="hidden text-center py-3 px-4 bg-red-900/50 border border-red-500/50 text-red-300 rounded-xl mb-4 text-sm"></div>
+
+        <!-- Sonuç & Önizleme Alanı -->
+        <div id="result" class="hidden space-y-5">
+            <!-- Video Bilgi Kartı -->
+            <div class="flex flex-col sm:flex-row gap-4 items-center bg-slate-700/50 p-4 rounded-xl border border-slate-600">
+                <img id="thumb" class="w-full sm:w-36 h-24 object-cover rounded-lg shadow" src="" alt="Thumbnail">
+                <div class="w-full">
+                    <h3 id="title" class="font-semibold text-sm sm:text-base line-clamp-2 text-slate-100"></h3>
+                    <p id="duration" class="text-xs text-indigo-300 mt-2 font-medium"></p>
+                </div>
+            </div>
+
+            <!-- Kalite ve Format Seçim Formu -->
+            <div class="bg-slate-700/30 p-4 rounded-xl border border-slate-700/60 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-2">İNDİRME FORMATI VE KALİTESİ</label>
+                    <select id="qualitySelect" class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl focus:outline-none focus:border-indigo-500 text-sm text-white">
+                        <!-- JS Tarafından Dinamik Doldurulacak -->
+                    </select>
+                </div>
+
+                <!-- İndirme Butonu -->
+                <button onclick="startDownload()" id="btnDownload" 
+                        class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl transition duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    Seçilen Kalitede İndir
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // YouTube Video ID Çıkarıcı
+        function extractVideoID(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+
+        // Saniyeyi Dakika/Saat Formatına Çevirici
+        function formatDuration(seconds) {
+            if (!seconds) return "";
+            const hrs = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            let ret = "";
+            if (hrs > 0) ret += "" + hrs + ":" + (mins < 10 ? "0" : "");
+            ret += "" + mins + ":" + (secs < 10 ? "0" : "");
+            ret += "" + secs;
+            return "Süre: " + ret;
+        }
+
+        async function fetchVideoData() {
+            const input = document.getElementById('videoUrl').value.trim();
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const result = document.getElementById('result');
+            const qualitySelect = document.getElementById('qualitySelect');
+
+            const videoId = extractVideoID(input);
+
+            if (!videoId) {
+                showError("Lütfen geçerli bir YouTube video linki girin.");
+                return;
+            }
+
+            // Arayüzü Sıfırla
+            error.classList.add('hidden');
+            result.classList.add('hidden');
+            loading.classList.remove('hidden');
+
+            try {
+                // Invidious Kamu Sunucusu API Endpoint'i
+                const response = await fetch(`https://inv.tux.pizza/api/v1/videos/${videoId}`);
+                
+                if (!response.ok) {
+                    throw new Error("API sunucusundan yanıt alınamadı.");
+                }
+
+                const data = await response.json();
+
+                // Video Bilgilerini Ekrana Bas
+                document.getElementById('thumb').src = data.videoThumbnails ? data.videoThumbnails[0].url : '';
+                document.getElementById('title').innerText = data.title;
+                document.getElementById('duration').innerText = formatDuration(data.lengthSeconds);
+
+                // Select Kutusunu Temizle
+                qualitySelect.innerHTML = '';
+
+                // Video Formatları (Hem Ses Hem Görüntü İçerenler)
+                const videoStreams = data.formatStreams || [];
+                // Sadece Ses Formatları (MP3/M4A)
+                const adaptiveAudio = data.adaptiveFormats ? data.adaptiveFormats.filter(f => f.type && f.type.startsWith('audio/')) : [];
+
+                if (videoStreams.length === 0 && adaptiveAudio.length === 0) {
+                    throw new Error("İndirilebilir format veya kalite seçeneği bulunamadı.");
+                }
+
+                // Video Seçeneklerini Ekle (MP4)
+                if (videoStreams.length > 0) {
+                    const optGroupVideo = document.createElement('optgroup');
+                    optGroupVideo.label = "Video Formatları (MP4)";
+
+                    videoStreams.forEach(item => {
+                        const option = document.createElement('option');
+                        option.value = item.url;
+                        option.textContent = `MP4 - ${item.qualityLabel || 'Standart Kalite'} (${item.container.toUpperCase()})`;
+                        optGroupVideo.appendChild(option);
+                    });
+                    qualitySelect.appendChild(optGroupVideo);
+                }
+
+                // Ses Seçeneklerini Ekle (Sadece Ses / Müzik)
+                if (adaptiveAudio.length > 0) {
+                    const optGroupAudio = document.createElement('optgroup');
+                    optGroupAudio.label = "Sadece Ses (Müzik / MP3)";
+
+                    adaptiveAudio.slice(0, 3).forEach((item, index) => {
+                        const option = document.createElement('option');
+                        option.value = item.url;
+                        const bitrate = item.bitrate ? Math.round(item.bitrate / 1000) + " kbps" : "Yüksek Kalite";
+                        option.textContent = `Ses / Müzik - ${bitrate} (${item.container.toUpperCase()})`;
+                        optGroupAudio.appendChild(option);
+                    });
+                    qualitySelect.appendChild(optGroupAudio);
+                }
+
+                loading.classList.add('hidden');
+                result.classList.remove('hidden');
+
+            } catch (err) {
+                loading.classList.add('hidden');
+                showError("Video bilgileri çekilirken bir hata oluştu. Lütfen linki kontrol edip tekrar deneyin.");
+                console.error(err);
+            }
+        }
+
+        function startDownload() {
+            const qualitySelect = document.getElementById('qualitySelect');
+            const selectedUrl = qualitySelect.value;
+
+            if (!selectedUrl) {
+                showError("Lütfen indirmek için bir kalite seçin.");
+                return;
+            }
+
+            // Seçilen Bağlantıyı Yeni Sekmede İndirmeye Başlat
+            window.open(selectedUrl, '_blank');
+        }
+
+        function showError(msg) {
+            const error = document.getElementById('error');
+            error.innerText = msg;
+            error.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
