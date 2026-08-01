@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hızlı Video İndirici</title>
-    <!-- Tailwind CSS CDN -->
+    <title>Hızlı Video & Müzik İndirici</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-4">
 
     <div class="max-w-xl w-full bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
         <h1 class="text-2xl font-bold text-center mb-2 text-indigo-400">Video & Müzik İndirici</h1>
-        <p class="text-slate-400 text-sm text-center mb-6">YouTube video bağlantısını yapıştırın, kaliteyi seçip indirin.</p>
+        <p class="text-slate-400 text-sm text-center mb-6">YouTube bağlantısını yapıştırın, formatı seçip indirin.</p>
 
         <!-- Link Giriş Formu -->
         <div class="flex gap-2 mb-6">
@@ -25,7 +25,7 @@
 
         <!-- Yükleniyor Uyarısı -->
         <div id="loading" class="hidden text-center py-6 text-indigo-400 font-semibold animate-pulse">
-            Video bilgileri ve kaliteler getiriliyor...
+            Video işleniyor, lütfen bekleyin...
         </div>
 
         <!-- Hata Uyarısı -->
@@ -38,32 +38,35 @@
                 <img id="thumb" class="w-full sm:w-36 h-24 object-cover rounded-lg shadow" src="" alt="Thumbnail">
                 <div class="w-full">
                     <h3 id="title" class="font-semibold text-sm sm:text-base line-clamp-2 text-slate-100"></h3>
-                    <p id="duration" class="text-xs text-indigo-300 mt-2 font-medium"></p>
                 </div>
             </div>
 
-            <!-- Kalite ve Format Seçim Formu -->
+            <!-- Format Seçim Formu -->
             <div class="bg-slate-700/30 p-4 rounded-xl border border-slate-700/60 space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-300 mb-2">İNDİRME FORMATI VE KALİTESİ</label>
-                    <select id="qualitySelect" class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl focus:outline-none focus:border-indigo-500 text-sm text-white">
-                        <!-- JS Tarafından Dinamik Doldurulacak -->
+                    <label class="block text-xs font-semibold text-slate-300 mb-2">İNDİRME FORMATI</label>
+                    <select id="formatSelect" class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl focus:outline-none focus:border-indigo-500 text-sm text-white">
+                        <option value="mp4">Video (MP4)</option>
+                        <option value="mp3">Müzik / Ses (MP3)</option>
                     </select>
                 </div>
 
-                <!-- İndirme Butonu -->
+                <!-- İndir Butonu -->
                 <button onclick="startDownload()" id="btnDownload" 
                         class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl transition duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                     </svg>
-                    Seçilen Kalitede İndir
+                    İndirmeyi Başlat
                 </button>
             </div>
         </div>
     </div>
 
     <script>
+        const API_KEY = "879d937f7a98707eecaf09ef6cdaccf8e37367fc";
+        let currentVideoUrl = "";
+
         // YouTube Video ID Çıkarıcı
         function extractVideoID(url) {
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
@@ -71,25 +74,11 @@
             return (match && match[2].length === 11) ? match[2] : null;
         }
 
-        // Saniyeyi Dakika/Saat Formatına Çevirici
-        function formatDuration(seconds) {
-            if (!seconds) return "";
-            const hrs = Math.floor(seconds / 3600);
-            const mins = Math.floor((seconds % 3600) / 60);
-            const secs = seconds % 60;
-            let ret = "";
-            if (hrs > 0) ret += "" + hrs + ":" + (mins < 10 ? "0" : "");
-            ret += "" + mins + ":" + (secs < 10 ? "0" : "");
-            ret += "" + secs;
-            return "Süre: " + ret;
-        }
-
         async function fetchVideoData() {
             const input = document.getElementById('videoUrl').value.trim();
             const loading = document.getElementById('loading');
             const error = document.getElementById('error');
             const result = document.getElementById('result');
-            const qualitySelect = document.getElementById('qualitySelect');
 
             const videoId = extractVideoID(input);
 
@@ -98,88 +87,60 @@
                 return;
             }
 
+            currentVideoUrl = input;
+
             // Arayüzü Sıfırla
             error.classList.add('hidden');
             result.classList.add('hidden');
             loading.classList.remove('hidden');
 
             try {
-                // Invidious Kamu Sunucusu API Endpoint'i
-                const response = await fetch(`https://inv.tux.pizza/api/v1/videos/${videoId}`);
-                
-                if (!response.ok) {
-                    throw new Error("API sunucusundan yanıt alınamadı.");
-                }
-
-                const data = await response.json();
-
-                // Video Bilgilerini Ekrana Bas
-                document.getElementById('thumb').src = data.videoThumbnails ? data.videoThumbnails[0].url : '';
-                document.getElementById('title').innerText = data.title;
-                document.getElementById('duration').innerText = formatDuration(data.lengthSeconds);
-
-                // Select Kutusunu Temizle
-                qualitySelect.innerHTML = '';
-
-                // Video Formatları (Hem Ses Hem Görüntü İçerenler)
-                const videoStreams = data.formatStreams || [];
-                // Sadece Ses Formatları (MP3/M4A)
-                const adaptiveAudio = data.adaptiveFormats ? data.adaptiveFormats.filter(f => f.type && f.type.startsWith('audio/')) : [];
-
-                if (videoStreams.length === 0 && adaptiveAudio.length === 0) {
-                    throw new Error("İndirilebilir format veya kalite seçeneği bulunamadı.");
-                }
-
-                // Video Seçeneklerini Ekle (MP4)
-                if (videoStreams.length > 0) {
-                    const optGroupVideo = document.createElement('optgroup');
-                    optGroupVideo.label = "Video Formatları (MP4)";
-
-                    videoStreams.forEach(item => {
-                        const option = document.createElement('option');
-                        option.value = item.url;
-                        option.textContent = `MP4 - ${item.qualityLabel || 'Standart Kalite'} (${item.container.toUpperCase()})`;
-                        optGroupVideo.appendChild(option);
-                    });
-                    qualitySelect.appendChild(optGroupVideo);
-                }
-
-                // Ses Seçeneklerini Ekle (Sadece Ses / Müzik)
-                if (adaptiveAudio.length > 0) {
-                    const optGroupAudio = document.createElement('optgroup');
-                    optGroupAudio.label = "Sadece Ses (Müzik / MP3)";
-
-                    adaptiveAudio.slice(0, 3).forEach((item, index) => {
-                        const option = document.createElement('option');
-                        option.value = item.url;
-                        const bitrate = item.bitrate ? Math.round(item.bitrate / 1000) + " kbps" : "Yüksek Kalite";
-                        option.textContent = `Ses / Müzik - ${bitrate} (${item.container.toUpperCase()})`;
-                        optGroupAudio.appendChild(option);
-                    });
-                    qualitySelect.appendChild(optGroupAudio);
-                }
+                // Önizleme görseli için standart YouTube thumbnail
+                document.getElementById('thumb').src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+                document.getElementById('title').innerText = "YouTube Videosu Bulundu";
 
                 loading.classList.add('hidden');
                 result.classList.remove('hidden');
 
             } catch (err) {
                 loading.classList.add('hidden');
-                showError("Video bilgileri çekilirken bir hata oluştu. Lütfen linki kontrol edip tekrar deneyin.");
+                showError("Video bilgileri yüklenirken bir hata oluştu.");
                 console.error(err);
             }
         }
 
-        function startDownload() {
-            const qualitySelect = document.getElementById('qualitySelect');
-            const selectedUrl = qualitySelect.value;
+        async function startDownload() {
+            const format = document.getElementById('formatSelect').value;
+            const btnDownload = document.getElementById('btnDownload');
+            const error = document.getElementById('error');
 
-            if (!selectedUrl) {
-                showError("Lütfen indirmek için bir kalite seçin.");
-                return;
+            error.classList.add('hidden');
+            btnDownload.disabled = true;
+            btnDownload.innerText = "İndirme Bağlantısı Hazırlanıyor...";
+
+            try {
+                const encodedUrl = encodeURIComponent(currentVideoUrl);
+                const apiUrl = `https://p.savenow.to/api/v2/download?format=${format}&url=${encodedUrl}&apikey=${API_KEY}`;
+
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+
+                if (data && (data.url || data.download_url)) {
+                    const downloadUrl = data.url || data.download_url;
+                    window.open(downloadUrl, '_blank');
+                } else if (data && data.status === "processing") {
+                    showError("Video işleniyor, lütfen birkaç saniye sonra tekrar indirmeyi deneyin.");
+                } else {
+                    throw new Error("İndirme bağlantısı alınamadı.");
+                }
+
+            } catch (err) {
+                showError("İndirme başlatılamadı. API yanıt vermiyor olabilir veya limit dolmuş olabilir.");
+                console.error(err);
+            } finally {
+                btnDownload.disabled = false;
+                btnDownload.innerText = "İndirmeyi Başlat";
             }
-
-            // Seçilen Bağlantıyı Yeni Sekmede İndirmeye Başlat
-            window.open(selectedUrl, '_blank');
         }
 
         function showError(msg) {
