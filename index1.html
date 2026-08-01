@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hızlı Video İndirici</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="max-w-xl w-full bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
+        <h1 class="text-2xl font-bold text-center mb-2 text-indigo-400">Video İndirici</h1>
+        <p class="text-slate-400 text-sm text-center mb-6">YouTube video linkini yapıştırın.</p>
+
+        <!-- Link Giriş Formu -->
+        <div class="flex gap-2 mb-6">
+            <input type="text" id="videoUrl" placeholder="https://www.youtube.com/watch?v=..." 
+                   class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl focus:outline-none focus:border-indigo-500 text-sm">
+            <button onclick="fetchVideoData()" id="btnFetch" 
+                    class="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-xl font-medium transition duration-200">
+                Sorgula
+            </button>
+        </div>
+
+        <!-- Yükleniyor Uyarısı -->
+        <div id="loading" class="hidden text-center py-4 text-indigo-400 font-semibold animate-pulse">
+            Video bilgileri çekiliyor, lütfen bekleyin...
+        </div>
+
+        <!-- Hata Uyarısı -->
+        <div id="error" class="hidden text-center py-3 px-4 bg-red-900/50 border border-red-500/50 text-red-300 rounded-xl mb-4 text-sm"></div>
+
+        <!-- Sonuç Alanı -->
+        <div id="result" class="hidden space-y-4">
+            <div class="flex flex-col sm:flex-row gap-4 items-center bg-slate-700/50 p-4 rounded-xl">
+                <img id="thumb" class="w-full sm:w-32 h-24 object-cover rounded-lg" src="" alt="Thumbnail">
+                <div>
+                    <h3 id="title" class="font-semibold text-sm line-clamp-2"></h3>
+                </div>
+            </div>
+
+            <!-- İndirme Seçenekleri Listesi -->
+            <div id="downloadLinks" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <script>
+        // YouTube Video ID Çıkarıcı
+        function extractVideoID(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+
+        async function fetchVideoData() {
+            const input = document.getElementById('videoUrl').value.trim();
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const result = document.getElementById('result');
+            const downloadLinks = document.getElementById('downloadLinks');
+
+            const videoId = extractVideoID(input);
+
+            if (!videoId) {
+                showError("Lütfen geçerli bir YouTube video linki girin.");
+                return;
+            }
+
+            error.classList.add('hidden');
+            result.classList.add('hidden');
+            loading.classList.remove('hidden');
+
+            try {
+                // Invidious Kamu Sunucusu API Endpoint'i
+                const response = await fetch(`https://inv.tux.pizza/api/v1/videos/${videoId}`);
+                
+                if (!response.ok) {
+                    throw new Error("API yanıt vermedi.");
+                }
+
+                const data = await response.json();
+
+                // Görsel ve başlık
+                document.getElementById('thumb').src = data.videoThumbnails ? data.videoThumbnails[0].url : '';
+                document.getElementById('title').innerText = data.title;
+
+                downloadLinks.innerHTML = '';
+
+                // Ses ve Videosu Birleşik Olan Bağlantıları Filtrele
+                const formatList = data.formatStreams || [];
+
+                if(formatList.length === 0) {
+                    throw new Error("İndirilebilir format bulunamadı.");
+                }
+
+                formatList.forEach(item => {
+                    downloadLinks.innerHTML += `
+                        <a href="${item.url}" target="_blank" rel="noopener noreferrer" download
+                           class="flex justify-between items-center bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-3 rounded-xl transition duration-200 text-sm">
+                           <span>Videoyu İndir (${item.qualityLabel || item.container})</span>
+                           <span class="text-xs bg-indigo-800 px-2 py-1 rounded">${item.container.toUpperCase()}</span>
+                        </a>
+                    `;
+                });
+
+                loading.classList.add('hidden');
+                result.classList.remove('hidden');
+
+            } catch (err) {
+                loading.classList.add('hidden');
+                showError("Video bilgileri alınırken bir hata oluştu. Lütfen başka bir video linki deneyin.");
+                console.error(err);
+            }
+        }
+
+        function showError(msg) {
+            const error = document.getElementById('error');
+            error.innerText = msg;
+            error.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
