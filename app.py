@@ -13,21 +13,31 @@ def download():
     if not url:
         return jsonify({'error': 'Lütfen geçerli bir URL girin.'}), 400
 
+    # YouTube Bot / Sign-in Engellerini Aşmak İçin Gelişmiş Ayarlar
     ydl_opts = {
         'format': 'best',
         'quiet': True,
         'no_warnings': True,
-        'extract_flat': False,
+        'nocheckcertificate': True,
+        # YouTube Bot doğrulamasını baypas eden istemci öncelikleri
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'android', 'mweb'],
+                'skip': ['hls', 'dash']
+            }
+        },
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             
-            # Doğrudan url yoksa formatlar içinden en uygun olanı seç
             download_url = info.get('url')
             if not download_url and 'formats' in info:
-                # Hem ses hem görüntü içeren formatı bul
                 for fmt in reversed(info['formats']):
                     if fmt.get('url'):
                         download_url = fmt['url']
@@ -42,8 +52,8 @@ def download():
                 'url': download_url
             })
     except Exception as e:
-        print("Hata:", str(e))
-        return jsonify({'error': 'Video çekilemedi. Link gizli bir hesaba ait olabilir veya geçersizdir.'}), 500
+        print("Hata Detayı:", str(e))
+        return jsonify({'error': f'Sunucu Hatası: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
