@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sınırsız meme İndirici</title>
-    <!-- Tailwind CSS -->
+    <title>Meme İndirici</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-4">
 
     <div class="max-w-xl w-full bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
-        <h1 class="text-2xl font-bold text-center mb-2 text-indigo-400">Ücretsiz Video İndirici</h1>
-        <p class="text-slate-400 text-sm text-center mb-6">YouTube, Instagram, TikTok veya X (Twitter) linkini yapıştırın.</p>
+        <h1 class="text-2xl font-bold text-center mb-2 text-indigo-400">Memeİndirici</h1>
+        <p class="text-slate-400 text-sm text-center mb-6"> Meme (YouTube, Instagram, TikTok veya X) bağlantısını yapıştırın.</p>
 
         <!-- Link Giriş Formu -->
         <div class="flex gap-2 mb-6">
             <input type="text" id="videoUrl" placeholder="https://..." 
                    class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl focus:outline-none focus:border-indigo-500 text-sm text-white placeholder-slate-400">
-            <button onclick="startDownloadProcess()" id="btnFetch" 
+            <button onclick="fetchVideoData()" id="btnFetch" 
                     class="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-xl font-medium transition duration-200 shrink-0">
                 Sorgula
             </button>
@@ -25,35 +25,36 @@
 
         <!-- Yükleniyor Uyarısı -->
         <div id="loading" class="hidden text-center py-6 text-indigo-400 font-semibold animate-pulse">
-            Video işleniyor ve indirme bağlantısı hazırlanıyor...
+            Video analiz ediliyor (Render sunucusu uyanıyor olabilir, birkaç sn sürebilir)...
         </div>
 
         <!-- Hata Uyarısı -->
         <div id="error" class="hidden text-center py-3 px-4 bg-red-900/50 border border-red-500/50 text-red-300 rounded-xl mb-4 text-sm"></div>
 
-        <!-- Sonuç Alanı -->
-        <div id="result" class="hidden space-y-4">
-            <div class="bg-slate-700/40 p-4 rounded-xl border border-slate-600 space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-300 mb-2">FORMAT SEÇİN</label>
-                    <select id="formatSelect" class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl focus:outline-none focus:border-indigo-500 text-sm text-white">
-                        <option value="1080">Video (En Yüksek Kalite)</option>
-                        <option value="audio">Sadece Ses (MP3/Audio)</option>
-                    </select>
+        <!-- Sonuç & Önizleme Alanı -->
+        <div id="result" class="hidden space-y-5">
+            <!-- Video Bilgi Kartı -->
+            <div class="flex flex-col sm:flex-row gap-4 items-center bg-slate-700/50 p-4 rounded-xl border border-slate-600">
+                <img id="thumb" class="w-full sm:w-36 h-24 object-cover rounded-lg shadow" src="" alt="Thumbnail">
+                <div class="w-full">
+                    <h3 id="title" class="font-semibold text-sm sm:text-base line-clamp-2 text-slate-100"></h3>
                 </div>
-
-                <a id="downloadBtn" href="#" target="_blank" download 
-                   class="block w-full text-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl transition duration-200 shadow-lg shadow-emerald-900/30">
-                   İndirmeyi Başlat
-                </a>
             </div>
+
+            <!-- İndir Butonu -->
+            <a id="downloadBtn" href="#" target="_blank" download 
+               class="block w-full text-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl transition duration-200 shadow-lg shadow-emerald-900/30">
+               Videoyu İndir
+            </a>
         </div>
     </div>
 
     <script>
-        async function startDownloadProcess() {
+        // Kendi Render Sunucu Adresimiz
+        const BACKEND_URL = "https://memeindirici.onrender.com/download";
+
+        async function fetchVideoData() {
             const input = document.getElementById('videoUrl').value.trim();
-            const format = document.getElementById('formatSelect').value;
             const loading = document.getElementById('loading');
             const error = document.getElementById('error');
             const result = document.getElementById('result');
@@ -64,46 +65,39 @@
                 return;
             }
 
+            // Arayüzü Sıfırla
             error.classList.add('hidden');
             result.classList.add('hidden');
             loading.classList.remove('hidden');
 
             try {
-                // GitHub Open-Source Cobalt Public API Endpoint
-                const response = await fetch('https://api.cobalt.tools/', {
+                // Kendi Backend API'mize İstek Atıyoruz
+                const response = await fetch(BACKEND_URL, {
                     method: 'POST',
                     headers: {
-                        'Accept': 'application/json',
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        url: input,
-                        videoQuality: format === 'audio' ? '720' : format,
-                        downloadMode: format === 'audio' ? 'audio' : 'auto'
-                    })
+                    body: JSON.stringify({ url: input })
                 });
 
                 const data = await response.json();
 
-                if (data.status === 'error') {
-                    throw new Error(data.text || "Video işlenemedi.");
+                if (!response.ok || data.error) {
+                    throw new Error(data.error || "Video işlenemedi.");
                 }
 
-                if (data.url) {
-                    downloadBtn.href = data.url;
-                    loading.classList.add('hidden');
-                    result.classList.remove('hidden');
-                } else if (data.status === 'picker' && data.picker.length > 0) {
-                    downloadBtn.href = data.picker[0].url;
-                    loading.classList.add('hidden');
-                    result.classList.remove('hidden');
-                } else {
-                    throw new Error("İndirme adresi oluşturulamadı.");
-                }
+                // Önizleme ve İndirme Bilgilerini Doldur
+                document.getElementById('thumb').src = data.thumbnail || 'https://placehold.co/300x200/334155/fff?text=Medya';
+                document.getElementById('title').innerText = data.title || "Video Hazır";
+                
+                downloadBtn.href = data.url;
+
+                loading.classList.add('hidden');
+                result.classList.remove('hidden');
 
             } catch (err) {
                 loading.classList.add('hidden');
-                showError("Video işlenirken bir sorun oluştu. Linkin gizli hesaba ait olmadığından emin olun veya tekrar deneyin.");
+                showError("Bir hata oluştu. Linkin doğru olduğundan emin olun.");
                 console.error(err);
             }
         }
