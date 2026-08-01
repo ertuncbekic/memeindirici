@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import yt_dlp
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -13,24 +14,19 @@ def download():
     if not url:
         return jsonify({'error': 'Lütfen geçerli bir URL girin.'}), 400
 
-    # YouTube Bot / Sign-in Engellerini Aşmak İçin Gelişmiş Ayarlar
+    cookie_path = 'cookies.txt'
+
+    # yt-dlp Gelişmiş İndirme Konfigürasyonu
     ydl_opts = {
         'format': 'best',
         'quiet': True,
         'no_warnings': True,
         'nocheckcertificate': True,
-        # YouTube Bot doğrulamasını baypas eden istemci öncelikleri
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['ios', 'android', 'mweb'],
-                'skip': ['hls', 'dash']
-            }
-        },
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-            'Accept-Language': 'en-US,en;q=0.9',
-        }
     }
+
+    # Eğer cookies.txt dosyası varsa YouTube isteğine ekle
+    if os.path.exists(cookie_path):
+        ydl_opts['cookiefile'] = cookie_path
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
