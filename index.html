@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sınırsız Video İndirici</title>
+    <title>Sınırsız Meme Arşivi İndirici</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-4">
 
     <div class="max-w-xl w-full bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
-        <h1 class="text-2xl font-bold text-center mb-2 text-indigo-400">Ücretsiz Video İndirici</h1>
+        <h1 class="text-2xl font-bold text-center mb-2 text-indigo-400">Ölümsüz Video İndirici</h1>
         <p class="text-slate-400 text-sm text-center mb-6">YouTube, Instagram, TikTok veya X bağlantısını yapıştırın.</p>
 
         <div class="flex gap-2 mb-6">
@@ -22,7 +22,7 @@
         </div>
 
         <div id="loading" class="hidden text-center py-6 text-indigo-400 font-semibold animate-pulse">
-            Açık kaynak sunucularından video çekiliyor, lütfen bekleyin...
+            Sunucu ağları taranıyor, video hazırlanıyor...
         </div>
 
         <div id="error" class="hidden text-center py-3 px-4 bg-red-900/50 border border-red-500/50 text-red-300 rounded-xl mb-4 text-sm"></div>
@@ -32,7 +32,7 @@
                 <img id="thumb" class="w-full sm:w-36 h-24 object-cover rounded-lg shadow" src="" alt="Thumbnail">
                 <div class="w-full">
                     <h3 id="title" class="font-semibold text-sm sm:text-base line-clamp-2 text-slate-100">Video Hazır</h3>
-                    <p class="text-xs text-emerald-400 mt-1">Sınırsız ve ücretsiz bağlantı oluşturuldu.</p>
+                    <p class="text-xs text-emerald-400 mt-1" id="serverInfo">Bağlantı oluşturuldu.</p>
                 </div>
             </div>
 
@@ -44,6 +44,13 @@
     </div>
 
     <script>
+        // Çalışan güncel sunucular ve CORS engel kırıcı
+        const COBALT_SERVERS = [
+            "https://api.cobalt.tools/", 
+            "https://api.cobalt.best/",
+            "https://corsproxy.io/?" + encodeURIComponent("https://api.cobalt.tools/")
+        ];
+
         function extractYouTubeID(url) {
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
@@ -57,9 +64,10 @@
             const result = document.getElementById('result');
             const downloadBtn = document.getElementById('downloadBtn');
             const thumbImg = document.getElementById('thumb');
+            const serverInfo = document.getElementById('serverInfo');
 
             if (!input.startsWith("http")) {
-                showError("Lütfen 'http' ile başlayan geçerli bir link girin.");
+                showError("Lütfen geçerli bir bağlantı girin.");
                 return;
             }
 
@@ -74,45 +82,56 @@
                 thumbImg.src = 'https://placehold.co/300x200/334155/fff?text=Medya+Hazir';
             }
 
-            try {
-                // Tamamen Ücretsiz ve Anahtar İstemeyen Cobalt Kamu Sunucusu
-                const response = await fetch('https://co.wuk.sh/api/json', {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        url: input,
-                        vQuality: "720", // Standart sorunsuz kalite
-                        filenamePattern: "classic"
-                    })
-                });
+            let finalDownloadUrl = null;
+            let usedServer = "";
 
-                const data = await response.json();
+            // SUNUCU DÖNGÜSÜ: Biri çökerse (Failed to fetch) diğeri devreye girer
+            for (let i = 0; i < COBALT_SERVERS.length; i++) {
+                try {
+                    const apiUrl = COBALT_SERVERS[i];
+                    console.log("Bağlanılıyor:", apiUrl);
+                    
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            url: input,
+                            videoQuality: "720"
+                        })
+                    });
 
-                let finalDownloadUrl = null;
+                    // Sunucu hata kodu döndürdüyse (örn: 403, 500) bu sunucuyu es geç
+                    if (!response.ok) continue; 
 
-                if (data.url) {
-                    finalDownloadUrl = data.url;
-                } else if (data.picker && data.picker.length > 0) {
-                    finalDownloadUrl = data.picker[0].url;
-                } else if (data.status === 'error') {
-                    throw new Error(data.text || "Sunucu bu videoyu işleyemedi.");
+                    const data = await response.json();
+
+                    if (data.url) {
+                        finalDownloadUrl = data.url;
+                        usedServer = "Yedek Sunucu " + (i + 1);
+                        break; // Link başarıyla alındı, döngüden çık!
+                    } else if (data.picker && data.picker.length > 0) {
+                        finalDownloadUrl = data.picker[0].url;
+                        usedServer = "Yedek Sunucu " + (i + 1);
+                        break;
+                    }
+
+                } catch (err) {
+                    console.log("Sunucu yanıt vermedi, sıradakine geçiliyor...");
+                    // "Failed to fetch" hatası burada yakalanır ve siteyi çökertmez.
                 }
+            }
 
-                if (finalDownloadUrl) {
-                    downloadBtn.href = finalDownloadUrl;
-                    loading.classList.add('hidden');
-                    result.classList.remove('hidden');
-                } else {
-                    throw new Error("İndirme bağlantısı oluşturulamadı.");
-                }
-
-            } catch (err) {
+            if (finalDownloadUrl) {
+                downloadBtn.href = finalDownloadUrl;
+                serverInfo.innerText = usedServer + " ile bağlantı kuruldu.";
                 loading.classList.add('hidden');
-                showError("Video işlenirken bir sorun oluştu: " + err.message);
-                console.error(err);
+                result.classList.remove('hidden');
+            } else {
+                loading.classList.add('hidden');
+                showError("Tüm ağlar şu anda meşgul veya video gizli olduğu için erişilemiyor.");
             }
         }
 
