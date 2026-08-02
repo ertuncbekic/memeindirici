@@ -16,15 +16,15 @@ def download():
 
     cookie_path = 'cookies.txt'
 
-    # yt-dlp Gelişmiş İndirme Konfigürasyonu
+    # Hazır birleşik video+ses formatını zorluyoruz
     ydl_opts = {
-        'format': 'best',
+        'format': 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
         'quiet': True,
         'no_warnings': True,
         'nocheckcertificate': True,
     }
 
-    # Eğer cookies.txt dosyası varsa YouTube isteğine ekle
+    # Cookies dosyası varsa ekle
     if os.path.exists(cookie_path):
         ydl_opts['cookiefile'] = cookie_path
 
@@ -33,14 +33,24 @@ def download():
             info = ydl.extract_info(url, download=False)
             
             download_url = info.get('url')
+            
+            # Doğrudan URL çıkmazsa format listesinden hazır MP4 bağlantısını çek
             if not download_url and 'formats' in info:
+                # Önce hem video hem ses barındıran formatları süz
                 for fmt in reversed(info['formats']):
-                    if fmt.get('url'):
+                    if fmt.get('vcodec') != 'none' and fmt.get('acodec') != 'none' and fmt.get('url'):
                         download_url = fmt['url']
                         break
+                
+                # Yine bulamazsa olan ilk geçerli URL'i al
+                if not download_url:
+                    for fmt in reversed(info['formats']):
+                        if fmt.get('url'):
+                            download_url = fmt['url']
+                            break
 
             if not download_url:
-                return jsonify({'error': 'İndirilebilir medya bağlantısı bulunamadı.'}), 400
+                return jsonify({'error': 'İndirilebilir uygun medya formatı bulunamadı.'}), 400
 
             return jsonify({
                 'title': info.get('title', 'Video'),
