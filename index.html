@@ -3,17 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meme İndirici</title>
-    <!-- Tailwind CSS CDN -->
+    <title>Sınırsız Video İndirici</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-4">
 
     <div class="max-w-xl w-full bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
-        <h1 class="text-2xl font-bold text-center mb-2 text-indigo-400">Memeİndirici</h1>
-        <p class="text-slate-400 text-sm text-center mb-6"> Meme (YouTube, Instagram, TikTok veya X) bağlantısını yapıştırın.</p>
+        <h1 class="text-2xl font-bold text-center mb-2 text-indigo-400">Ücretsiz Video İndirici</h1>
+        <p class="text-slate-400 text-sm text-center mb-6">YouTube, Instagram, TikTok veya X bağlantısını yapıştırın.</p>
 
-        <!-- Link Giriş Formu -->
         <div class="flex gap-2 mb-6">
             <input type="text" id="videoUrl" placeholder="https://..." 
                    class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl focus:outline-none focus:border-indigo-500 text-sm text-white placeholder-slate-400">
@@ -23,35 +21,34 @@
             </button>
         </div>
 
-        <!-- Yükleniyor Uyarısı -->
         <div id="loading" class="hidden text-center py-6 text-indigo-400 font-semibold animate-pulse">
-            Video analiz ediliyor (Render sunucusu uyanıyor olabilir, birkaç sn sürebilir)...
+            Açık kaynak sunucularından video çekiliyor, lütfen bekleyin...
         </div>
 
-        <!-- Hata Uyarısı -->
         <div id="error" class="hidden text-center py-3 px-4 bg-red-900/50 border border-red-500/50 text-red-300 rounded-xl mb-4 text-sm"></div>
 
-        <!-- Sonuç & Önizleme Alanı -->
         <div id="result" class="hidden space-y-5">
-            <!-- Video Bilgi Kartı -->
             <div class="flex flex-col sm:flex-row gap-4 items-center bg-slate-700/50 p-4 rounded-xl border border-slate-600">
                 <img id="thumb" class="w-full sm:w-36 h-24 object-cover rounded-lg shadow" src="" alt="Thumbnail">
                 <div class="w-full">
-                    <h3 id="title" class="font-semibold text-sm sm:text-base line-clamp-2 text-slate-100"></h3>
+                    <h3 id="title" class="font-semibold text-sm sm:text-base line-clamp-2 text-slate-100">Video Hazır</h3>
+                    <p class="text-xs text-emerald-400 mt-1">Sınırsız ve ücretsiz bağlantı oluşturuldu.</p>
                 </div>
             </div>
 
-            <!-- İndir Butonu -->
             <a id="downloadBtn" href="#" target="_blank" download 
                class="block w-full text-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl transition duration-200 shadow-lg shadow-emerald-900/30">
-               Videoyu İndir
+               Hemen İndir
             </a>
         </div>
     </div>
 
     <script>
-        // Kendi Render Sunucu Adresimiz
-        const BACKEND_URL = "https://memeindirici.onrender.com/download";
+        function extractYouTubeID(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
 
         async function fetchVideoData() {
             const input = document.getElementById('videoUrl').value.trim();
@@ -59,45 +56,62 @@
             const error = document.getElementById('error');
             const result = document.getElementById('result');
             const downloadBtn = document.getElementById('downloadBtn');
+            const thumbImg = document.getElementById('thumb');
 
             if (!input.startsWith("http")) {
-                showError("Lütfen geçerli bir video bağlantısı girin.");
+                showError("Lütfen 'http' ile başlayan geçerli bir link girin.");
                 return;
             }
 
-            // Arayüzü Sıfırla
             error.classList.add('hidden');
             result.classList.add('hidden');
             loading.classList.remove('hidden');
 
+            const ytId = extractYouTubeID(input);
+            if (ytId) {
+                thumbImg.src = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+            } else {
+                thumbImg.src = 'https://placehold.co/300x200/334155/fff?text=Medya+Hazir';
+            }
+
             try {
-                // Kendi Backend API'mize İstek Atıyoruz
-                const response = await fetch(BACKEND_URL, {
+                // Tamamen Ücretsiz ve Anahtar İstemeyen Cobalt Kamu Sunucusu
+                const response = await fetch('https://co.wuk.sh/api/json', {
                     method: 'POST',
                     headers: {
+                        'Accept': 'application/json',
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ url: input })
+                    body: JSON.stringify({
+                        url: input,
+                        vQuality: "720", // Standart sorunsuz kalite
+                        filenamePattern: "classic"
+                    })
                 });
 
                 const data = await response.json();
 
-                if (!response.ok || data.error) {
-                    throw new Error(data.error || "Video işlenemedi.");
+                let finalDownloadUrl = null;
+
+                if (data.url) {
+                    finalDownloadUrl = data.url;
+                } else if (data.picker && data.picker.length > 0) {
+                    finalDownloadUrl = data.picker[0].url;
+                } else if (data.status === 'error') {
+                    throw new Error(data.text || "Sunucu bu videoyu işleyemedi.");
                 }
 
-                // Önizleme ve İndirme Bilgilerini Doldur
-                document.getElementById('thumb').src = data.thumbnail || 'https://placehold.co/300x200/334155/fff?text=Medya';
-                document.getElementById('title').innerText = data.title || "Video Hazır";
-                
-                downloadBtn.href = data.url;
-
-                loading.classList.add('hidden');
-                result.classList.remove('hidden');
+                if (finalDownloadUrl) {
+                    downloadBtn.href = finalDownloadUrl;
+                    loading.classList.add('hidden');
+                    result.classList.remove('hidden');
+                } else {
+                    throw new Error("İndirme bağlantısı oluşturulamadı.");
+                }
 
             } catch (err) {
                 loading.classList.add('hidden');
-                showError("Bir hata oluştu. Linkin doğru olduğundan emin olun.");
+                showError("Video işlenirken bir sorun oluştu: " + err.message);
                 console.error(err);
             }
         }
