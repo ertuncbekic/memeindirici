@@ -1,4 +1,0 @@
-Flask
-flask-cors
-yt-dlp>=2024.01.01
-gunicorn
